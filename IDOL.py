@@ -19,7 +19,6 @@ class vgg_enc(nn.Module):
     def __init__(self, Pre_Train):
         super().__init__()
         self.backbone = models.vgg13_bn(Pre_Train)
-        # print('模型各部分名称', self.backbone._modules.keys())
         self.backbone.features._modules['0'] = nn.Conv2d(4, 64, kernel_size=(3, 3), stride=(1, 1), padding=1)
         self.share_net = self.backbone.features
         self.flatten = nn.Flatten()
@@ -40,9 +39,7 @@ class Plt_Dist(nn.Module):
         b, d = plt.size()
         m = self.relu(self.fc_m(plt))
         s = self.relu(self.fc_s(plt))
-        '''由plt决定强度身份模式'''
         dist_samp = m + s * dist
-        # dist_samp = dist_samp.to(config.device)
         return dist_samp
 
 def Dist(shf, id_dim=16):
@@ -194,8 +191,6 @@ def initialize_weights(module):
     for n, m in module.named_children():
         if isinstance(m, nn.Conv2d):
             nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
-            # if m.bias is not None:
-            #     nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.Linear):
             nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
 
@@ -210,18 +205,12 @@ class GEnc_GMMDist(nn.Module):
         self.mu = nn.Parameter(torch.randn(num_components, feature_dim))  # 均值向量
         self.log_var = nn.Parameter(torch.randn(num_components, feature_dim))  # 对数方差
     def forward(self, gdata, dist):
-        """
-        输入：dist 形状为 (batch_size, feature_dim)
-        输出：对数概率密度，形状为 (batch_size)
-        """
         batch_size = dist.size(0)
         z = self.conv_z(gdata.x, gdata.edge_index)
         # 计算混合权重（Softmax归一化）
         alpha_sh = F.softmax(self.alpha_sh(z, gdata.edge_index).squeeze(dim=-1), dim=-1)      # (b, num_components)
         # 计算方差（确保正值）
         var = torch.exp(self.log_var)  # (num_components, feature_dim)
-
-        # 扩展维度以支持广播计算
         dist_expanded = dist.unsqueeze(1)  # (batch_size, 1, feature_dim)
         mu_expanded = self.mu.unsqueeze(0)  # (1, num_components, feature_dim)
         var_expanded = var.unsqueeze(0)  # (1, num_components, feature_dim)
@@ -249,8 +238,6 @@ class PRG_SALSTM8(nn.Module):
         self.conv13 = nn.Conv2d(in_channels*2+1, in_channels, kernel_size=1)
 
     def sa_conv_lstm(self, x, en_1d): ##[T, B, 512, 4, 4] [B,1,4,4]
-        # #看sa-conv-lstm的
-        # M,H：每一个小的 都是（B，256）
         memory = torch.zeros_like(x[0])  # [B, 512, 4, 4]
         H = torch.zeros_like(x[0])
         C = torch.randn_like(x[0]) * 1e-6
