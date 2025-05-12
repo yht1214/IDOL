@@ -1,20 +1,18 @@
-# Phy-CoCo
-The code of "Phy-CoCo: Physical Constraint-based Correlation Learning for Tropical Cyclone Intensity and Size Estimation" accepted by ECAI2024.
+# IDOL
+The code of "IDOL: Meeting Diverse Distribution Shifts with Prior Physics for Tropical Cyclone Multi-Task Estimation" submitted to NIPS2025.
 
 ## Introduction
 
-![***Phy-CoCo_framework***](https://github.com/Zjut-MultimediaPlus/Phy-CoCo/blob/main/figs/phy-coco.png)
+![***IDOL_framework***]([https://github.com/Zjut-MultimediaPlus/Phy-CoCo/blob/main/figs/phy-coco.png](https://github.com/yht1214/IDOL/blob/main/figs/fig-IODL.png))
 
 Contribution:
-1. We proposed CoM based on Centrally Expanded Pooling (CEP) to model the correlation between the extracted features and the estimated attributes, fully exploring task-specific features.
-2. To facilitate cross-task interaction, we designed bidirectional physical constraints applied to the transformation of features of interrelated tasks using Multi-Domain Recurrent Convolutions (MDRC).
-3. Extensive experiments are conducted on multi-modal TC datasets to demonstrate the superiority of Phy-CoCo over the state-of-the-art TC estimation methods. The results highlight that Phy-CoCo is effective for both TC MSW and RMW estimation.
+1. To address concept shift in multi-task learning, we propose a Task Dependency Flow learning module. By incorporating the prior wind field model, the conditional probabilities of multiple specific tasks are decoupled to model the dependencies among tasks, thereby facilitating the learning of distinct TC attribute identities.
+2. To address covariate and label shifts, we design a Correlation-Aware Information Bridge to model the latent distribution aligned with both ends of the model. The resulting task-shared identity serves as an information bridge between the input and output by capturing their invariant physical correlations.
+3. Extensive experiments are conducted on multiple TC estimation and prediction tasks to evaluate the effectiveness of the proposed IDOL. The results demonstrate the efficacy of IDOL in handling diverse distribution shifts through feature space constraints informed by prior physical knowledge.
 
 ## Requirements 
 * python 3.8.8
 * Pytorch 1.1.0
 * CUDA 11.7
 ## Dataset
-通过网盘分享的文件：phycoco数据集
-链接: https://pan.baidu.com/s/11qnFtYeErHXH0VYNO7HRsA 提取码: coco 
---来自百度网盘超级会员v1的分享
+Physical Dynamic TC datasets (PDTC) will be open-sourced upon acceptance of the paper.
