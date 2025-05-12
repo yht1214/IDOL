@@ -10,14 +10,7 @@ import numpy as np
 import Set_seed
 from Dataset import *
 import Config as config
-# from IDPil_CNF import *
-# from IDPil_closs import *
-from IDPil_dkgi import *
-import ssl
-import smtplib
-from email.header import Header
-from email.utils import formataddr
-from email.mime.text import MIMEText
+from IDOL import *
 
 def save_model(model, model_output_dir, epoch):
     save_model_file = os.path.join(model_output_dir, "epoch_{}.pth".format(epoch))
@@ -34,9 +27,7 @@ def train_model(model, loss_func, dataset, optimizer, w_params, epoch):
     batch_r34_loss = 0
     batch_mslp_loss = 0
 
-    batch_MIsh_f_loss = 0
-    batch_MIsh_y_loss = 0
-    batch_MIsp_y_loss = 0
+    batch_simr_loss = 0
 
     batch_loss = 0
     item = 0
@@ -80,10 +71,7 @@ def train_model(model, loss_func, dataset, optimizer, w_params, epoch):
 
         optimizer.zero_grad()
 
-        # msw, mslp, rmw, r34 = model(btemp, plt, TCA_Lable)
-        # msw, mslp, rmw, r34, loss_sp = model(btemp, plt, TCA_Lable)
-        # msw, mslp, rmw, r34 = model(btemp, plt, pre_pr, TCA_Lable)
-        msw, mslp, rmw, r34, loss_sp = model(btemp, plt, pre_pr, TCA_Lable)
+        msw, mslp, rmw, r34, loss_simr = model(btemp, plt, pre_pr, TCA_Lable)
 
         print("msw_label={}".format(msw_label))
         print("msw={}".format(msw))
@@ -99,7 +87,6 @@ def train_model(model, loss_func, dataset, optimizer, w_params, epoch):
         rmw_loss = loss_func(rmw.float(), rmw_label.float())
         r34_loss = loss_func(r34.float(), r34_label.float())
 
-        # cnf_loss = (cnf_shloss + cnf_sploss) * 0.1
         total_loss = w_params[0] * msw_loss + w_params[1] * mslp_loss + w_params[2] * rmw_loss + w_params[3] * r34_loss\
                      + 0.5 * loss_sp
 
@@ -113,8 +100,8 @@ def train_model(model, loss_func, dataset, optimizer, w_params, epoch):
                     grad_norm = round(param.grad.data.norm(2).item(), 5)
                     print(
                         f'Epoch [{epoch}], Step [{batch + 1}/{len(dataset)}], Gradient norm: {grad_norm}')
-        # print("Train Epoch = {} loss_sh = {}".format(epoch, loss_sh.data.item()))
-        print("Train Epoch = {} loss_sp = {}".format(epoch, loss_sp.data.item()))
+                    
+        print("Train Epoch = {} loss_simr = {}".format(epoch, loss_simr.data.item()))
         print("Train Epoch = {} msw Loss = {}".format(epoch, msw_loss.data.item()))
         print("Train Epoch = {} mslp Loss = {}".format(epoch, mslp_loss.data.item()))
         print("Train Epoch = {} rmw Loss = {}".format(epoch, rmw_loss.data.item()))
@@ -122,16 +109,13 @@ def train_model(model, loss_func, dataset, optimizer, w_params, epoch):
         print("Train Epoch = {} Loss = {}".format(epoch, total_loss.data.item()))
         batch_loss += total_loss.data.item()
 
-        # batch_MIsh_f_loss += MIsh_f.item()
-        # batch_MIsh_y_loss += loss_sh.item()
-        batch_MIsp_y_loss += loss_sp.item()
+        batch_simr_loss += loss_simr.item()
 
         batch_msw_loss += msw_loss.data.item()
         batch_mslp_loss += mslp_loss.data.item()
         batch_rmw_loss += rmw_loss.data.item()
         batch_r34_loss += r34_loss.data.item()
 
-        # 反归一化看train error
         msw_label_re = msw_label.cpu().detach().numpy() * (170 - 35) + 35
         msw_re = msw.cpu().detach().numpy() * (170 - 35) + 35
         msw_error = msw_error + np.sum(np.abs(msw_re - msw_label_re))
@@ -152,21 +136,21 @@ def train_model(model, loss_func, dataset, optimizer, w_params, epoch):
         item += len(msw_re)
 
     print("Train Epoch = {} mean loss = {} ".format(epoch, batch_loss / batch_num))
-    print("Train Epoch = {} mean loss_sh = {} ".format(epoch, batch_MIsp_y_loss / batch_num))
+    print("Train Epoch = {} mean loss_sh = {} ".format(epoch, batch_simr_loss / batch_num))
     print("Train Epoch = {} mean msw error = {} ".format(epoch, msw_error / item))
     print("Train Epoch = {} mean mslp error = {} ".format(epoch, mslp_error / item))
     print("Train Epoch = {} mean rmw error = {} ".format(epoch, rmw_error / item))
     print("Train Epoch = {} mean r34 error = {} ".format(epoch, r34_error / item))
 
     return batch_loss / batch_num, msw_error / item, mslp_error / item, rmw_error / item, r34_error / item, \
-           batch_MIsh_f_loss / batch_num, batch_MIsh_y_loss / batch_num, batch_MIsp_y_loss / batch_num
+           batch_simr_loss / batch_num
 
 def valid_model(model, loss_func, dataset, epoch):
 
     model.eval()
 
     batch_loss = 0
-    batch_cnf_loss = 0
+    batch_simr_loss = 0
 
     batch_num = 0
     item = 0
@@ -175,10 +159,6 @@ def valid_model(model, loss_func, dataset, epoch):
     mslp_error = 0
     rmw_error = 0
     r34_error = 0
-
-    batch_MIsh_f_loss = 0
-    batch_MIsh_y_loss = 0
-    batch_MIsp_y_loss = 0
 
     with torch.no_grad():
         for batch, data in enumerate(tqdm(dataset)):
@@ -212,10 +192,7 @@ def valid_model(model, loss_func, dataset, epoch):
             TCA_Lable = [i.unsqueeze(1) for i in [msw_label, mslp_label, rmw_label, r34_label]]
             TCA_Lable = torch.cat(TCA_Lable, dim=1)
 
-            # msw, mslp, rmw, r34 = model(btemp, plt, TCA_Lable)
-            # msw, mslp, rmw, r34, loss_sp = model(btemp, plt, TCA_Lable)
-            # msw, mslp, rmw, r34 = model(btemp, plt, pre_pr, TCA_Lable)
-            msw, mslp, rmw, r34, loss_sp = model(btemp, plt, pre_pr, TCA_Lable)
+            msw, mslp, rmw, r34, loss_simr = model(btemp, plt, pre_pr, TCA_Lable)
 
             print("msw_label={}".format(msw_label))
             print("msw={}".format(msw))
@@ -231,21 +208,18 @@ def valid_model(model, loss_func, dataset, epoch):
             rmw_loss = loss_func(rmw.float(), rmw_label.float())
             r34_loss = loss_func(r34.float(), r34_label.float())
 
-            # cnf_loss = (cnf_shloss + cnf_sploss) * 0.1
             total_loss = w_params[0] * msw_loss + w_params[1] * mslp_loss + \
                          w_params[2] * rmw_loss + w_params[3] * r34_loss\
                          + 0.5 * loss_sp
-            # print("Valid Epoch = {} loss_sh = {}".format(epoch, loss_sh.data.item()))
-            print("Valid Epoch = {} loss_sp = {}".format(epoch, loss_sp.data.item()))
+          
+            print("Valid Epoch = {} loss_simr = {}".format(epoch, loss_simr.data.item()))
             print("Valid Epoch = {} msw Loss = {}".format(epoch, msw_loss.data.item()))
             print("Valid Epoch = {} mslp Loss = {}".format(epoch, mslp_loss.data.item()))
             print("Valid Epoch = {} rmw Loss = {}".format(epoch, rmw_loss.data.item()))
             print("Valid Epoch = {} r34 Loss = {}".format(epoch, r34_loss.data.item()))
 
             batch_loss += total_loss.data.item()
-            # batch_MIsh_f_loss += MIsh_f.item()
-            # batch_MIsh_y_loss += loss_sh.item()
-            batch_MIsp_y_loss += loss_sp.item()
+            batch_simr_loss += loss_sp.item()
 
             msw_label_re = msw_label.cpu().detach().numpy() * (170 - 35) + 35
             msw_re = msw.cpu().detach().numpy() * (170 - 35) + 35
@@ -267,30 +241,22 @@ def valid_model(model, loss_func, dataset, epoch):
             item += len(msw_re)
 
     print("Valid Epoch = {} mean loss = {} ".format(epoch, batch_loss / batch_num))
-    print("Valid Epoch = {} mean loss_sh = {} ".format(epoch, batch_MIsp_y_loss / batch_num))
+    print("Valid Epoch = {} mean loss_sh = {} ".format(epoch, batch_simr_loss / batch_num))
     print("Valid Epoch = {} mean msw error = {} ".format(epoch, msw_error / item))
     print("Valid Epoch = {} mean mslp error = {} ".format(epoch, mslp_error / item))
     print("Valid Epoch = {} mean rmw error = {} ".format(epoch, rmw_error / item))
     print("Valid Epoch = {} mean r34 error = {} ".format(epoch, r34_error / item))
 
     return batch_loss / batch_num, msw_error / item, mslp_error / item, rmw_error / item, r34_error / item, \
-           batch_MIsh_f_loss / batch_num, batch_MIsh_y_loss / batch_num, batch_MIsp_y_loss / batch_num
+           batch_simr_loss / batch_num
 
 def train(model, Estim_Loss, optimizer, w_params, epochs):
     train_transform = None
     valid_transform = None
-    '''k_era_var'''
-    # train_dataset = Findpxh_Dataset_kv(config.train_k8_path, config.train_zqtuv_path, 3, None, config.data_format)
-    # valid_dataset = Findpxh_Dataset_kv(config.valid_k8_path, config.valid_zqtuv_path, 3, None, config.data_format)
-    '''k'''
+    
     train_dataset = Findpxh_Dataset_k_pr(config.train_k8_path, 3, None, config.data_format)
     valid_dataset = Findpxh_Dataset_k_pr(config.valid_k8_path, 3, None, config.data_format)
-    '''k_era_var_aux'''
-    # train_dataset = Findpxh_Dataset_kva(config.train_k8_path, config.train_zqtuv_path,
-    #                                     config.train_aux_path, 3, None, config.data_format)
-    # valid_dataset = Findpxh_Dataset_kva(config.valid_k8_path, config.valid_zqtuv_path,
-    #                                     config.valid_aux_path, 3, None, config.data_format)
-
+    
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset, batch_size=config.batch_size,
         shuffle=True, num_workers=config.num_workers,
@@ -310,12 +276,8 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
     train_loss_array = np.zeros(epochs + 1)
     valid_loss_array = np.zeros(epochs + 1)
 
-    train_mishf_array = np.zeros(epochs + 1)
-    valid_mishf_array = np.zeros(epochs + 1)
-    train_mishy_array = np.zeros(epochs + 1)
-    valid_mishy_array = np.zeros(epochs + 1)
-    train_mispy_array = np.zeros(epochs + 1)
-    valid_mispy_array = np.zeros(epochs + 1)
+    train_simr_array = np.zeros(epochs + 1)
+    valid_simr_array = np.zeros(epochs + 1)
 
     train_msw_error_array = np.zeros(epochs + 1)
     valid_msw_error_array = np.zeros(epochs + 1)
@@ -327,21 +289,15 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
     valid_r34_error_array = np.zeros(epochs + 1)
 
     for epoch in range(start_epoch + 1, epochs + 1):
-        train_epoch_loss, train_msw_error, train_mslp_error, train_rmw_error, train_r34_error, \
-        train_MIsh_f_loss, train_MIsh_y_loss, train_MIsp_y_loss = \
+        train_epoch_loss, train_msw_error, train_mslp_error, train_rmw_error, train_r34_error, train_simr_loss = \
             train_model(model, Estim_Loss, train_dataloader, optimizer, w_params, epoch)
-        valid_epoch_loss, valid_msw_error, valid_mslp_error, valid_rmw_error, valid_r34_error, \
-        valid_MIsh_f_loss, valid_MIsh_y_loss, valid_MIsp_y_loss = \
+        valid_epoch_loss, valid_msw_error, valid_mslp_error, valid_rmw_error, valid_r34_error, valid_simr_loss = \
             valid_model(model, Estim_Loss, valid_dataloader, epoch)
 
         train_loss_array[epoch] = train_epoch_loss
         valid_loss_array[epoch] = valid_epoch_loss
-        train_mishf_array[epoch] = train_MIsh_f_loss
-        valid_mishf_array[epoch] = valid_MIsh_f_loss
-        train_mishy_array[epoch] = train_MIsh_y_loss
-        valid_mishy_array[epoch] = valid_MIsh_y_loss
-        train_mispy_array[epoch] = train_MIsp_y_loss
-        valid_mispy_array[epoch] = valid_MIsp_y_loss
+        train_simr_array[epoch] = train_simr_loss
+        valid_simr_array[epoch] = valid_simr_loss
 
         train_msw_error_array[epoch] = train_msw_error
         valid_msw_error_array[epoch] = valid_msw_error
@@ -354,7 +310,7 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
 
         # 模型保存
         if epoch % config.save_model_iter == 0:
-            save_model(model, config.model_output_dir_dkgi, epoch)
+            save_model(model, config.model_output_dir, epoch)
 
     # 绘制loss
     fig_loss, ax_loss = plt.subplots(figsize=(12, 8))
@@ -366,44 +322,20 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
     # 添加图例
     ax_loss.legend(handles=[train_loss, val_loss], labels=['train_epoch_loss', 'val_epoch_loss'],
                          loc='best')
-    fig_loss.savefig(config.save_fig_dir_dkgi + 'loss.png')
+    fig_loss.savefig(config.save_fig_dir + 'loss.png')
     plt.close(fig_loss)
 
-    fig_mishf, ax_mishf = plt.subplots(figsize=(12, 8))
-    train_mishf, = plt.plot(np.arange(1, epochs + 1), train_mishf_array[1:], 'r')
-    val_mishf, = plt.plot(np.arange(1, epochs + 1), valid_mishf_array[1:], 'g')
+    fig_simr, ax_simr = plt.subplots(figsize=(12, 8))
+    train_simr, = plt.plot(np.arange(1, epochs + 1), train_simr_array[1:], 'r')
+    val_simr, = plt.plot(np.arange(1, epochs + 1), valid_simr_array[1:], 'g')
     plt.xlabel('epochs')
-    plt.ylabel('mishf loss')
-    plt.title("train/valid mishf loss vs epoch")
+    plt.ylabel('simr loss')
+    plt.title("train/valid simr loss vs epoch")
     # 添加图例
-    ax_mishf.legend(handles=[train_mishf, val_mishf], labels=['train_epoch_loss', 'val_epoch_loss'],
+    ax_simr.legend(handles=[train_simr, val_simr], labels=['train_epoch_loss', 'val_epoch_loss'],
                    loc='best')
-    fig_mishf.savefig(config.save_fig_dir_dkgi + 'mishf_loss.png')
-    plt.close(fig_mishf)
-
-    fig_mishy, ax_mishy = plt.subplots(figsize=(12, 8))
-    train_mishy, = plt.plot(np.arange(1, epochs + 1), train_mishy_array[1:], 'r')
-    val_mishy, = plt.plot(np.arange(1, epochs + 1), valid_mishy_array[1:], 'g')
-    plt.xlabel('epochs')
-    plt.ylabel('mishy loss')
-    plt.title("train/valid mishy loss vs epoch")
-    # 添加图例
-    ax_mishy.legend(handles=[train_mishy, val_mishy], labels=['train_epoch_loss', 'val_epoch_loss'],
-                    loc='best')
-    fig_mishy.savefig(config.save_fig_dir_dkgi + 'mishy_loss.png')
-    plt.close(fig_mishy)
-
-    fig_mispy, ax_mispy = plt.subplots(figsize=(12, 8))
-    train_mispy, = plt.plot(np.arange(1, epochs + 1), train_mispy_array[1:], 'r')
-    val_mispy, = plt.plot(np.arange(1, epochs + 1), valid_mispy_array[1:], 'g')
-    plt.xlabel('epochs')
-    plt.ylabel('mispy loss')
-    plt.title("train/valid mispy loss vs epoch")
-    # 添加图例
-    ax_mispy.legend(handles=[train_mispy, val_mispy], labels=['train_epoch_loss', 'val_epoch_loss'],
-                    loc='best')
-    fig_mispy.savefig(config.save_fig_dir_dkgi + 'mispy_loss.png')
-    plt.close(fig_mispy)
+    fig_simr.savefig(config.save_fig_dir + 'simr_loss.png')
+    plt.close(fig_simr)
 
     fig_msw_error, ax_msw_error = plt.subplots(figsize=(12, 8))
     train_msw_error, = plt.plot(np.arange(1, epochs + 1),
@@ -418,7 +350,7 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
                               valid_msw_error],
                      labels=['train_error', 'valid_error'],
                      loc='best')
-    fig_msw_error.savefig(config.save_fig_dir_dkgi + 'msw_error.png')
+    fig_msw_error.savefig(config.save_fig_dir + 'msw_error.png')
     plt.close(fig_msw_error)
 
     fig_mslp_error, ax_mslp_error = plt.subplots(figsize=(12, 8))
@@ -434,7 +366,7 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
                                  valid_mslp_error],
                         labels=['train_error', 'valid_error'],
                         loc='best')
-    fig_mslp_error.savefig(config.save_fig_dir_dkgi + 'mslp_error.png')
+    fig_mslp_error.savefig(config.save_fig_dir + 'mslp_error.png')
     plt.close(fig_mslp_error)
 
     fig_rmw_error, ax_rmw_error = plt.subplots(figsize=(12, 8))
@@ -450,7 +382,7 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
                                  valid_rmw_error],
                         labels=['train_error', 'valid_error'],
                         loc='best')
-    fig_rmw_error.savefig(config.save_fig_dir_dkgi + 'rmw_error.png')
+    fig_rmw_error.savefig(config.save_fig_dir + 'rmw_error.png')
     plt.close(fig_rmw_error)
 
     fig_r34_error, ax_r34_error = plt.subplots(figsize=(12, 8))
@@ -466,68 +398,16 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
                                  valid_r34_error],
                         labels=['train_error', 'valid_error'],
                         loc='best')
-    fig_r34_error.savefig(config.save_fig_dir_dkgi + 'r34_error.png')
+    fig_r34_error.savefig(config.save_fig_dir + 'r34_error.png')
     plt.close(fig_r34_error)
-
-def send_email(content):
-    # qq email code :sirayzxaphldcaaj
-    # QQ邮件服务器的安全端口465，注意是数字格式
-    smtp_port = 465
-    # QQ邮件服务器的地址
-    smtp_host = 'smtp.qq.com'
-    # 登录QQ邮件服务器的用户名
-    user_name = '329769800@qq.com'
-    # 此处填写自己申请到的登录QQ邮件服务器的授权码
-    user_pass = 'sirayzxaphldcaaj'
-    # 发件人邮箱地址
-    sender = '329769800@qq.com'
-    # 收件人邮箱地址，列表中可以包含多个收件人地址
-    receivers = ['329769800@qq.com']
-    # 构造邮件，邮件体内容是一段文本，采用'utf-8'
-    email_msg = MIMEText('your project:' + content +' already over', 'plain', 'utf-8')
-    # 构造邮件头中主题，突出邮件内容重点
-    email_msg['Subject'] = Header('程序运行通知', 'utf-8').encode()
-    # 构造邮件头中的发件人，包括昵称和邮箱账号
-    email_msg['From'] = formataddr((Header('project notification', 'utf-8').encode(),
-                                    '329769800@qq.com'))
-    # 构造邮件头中的收件人，包括昵称和邮箱账号
-    email_msg['To'] = formataddr((Header('project notification', 'utf-8').encode(),
-                                  '329769800@qq.com'))
-    context = ssl.create_default_context()
-    try:
-        # 采用with结构登录邮箱并发送邮件，执行结束后可自动断开与邮件服务器的连接
-        with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context) as email_svr:
-            # 输入QQ邮箱的账号和授权码后登录
-            email_svr.login(user_name, user_pass)
-            # 邮箱登录成功后即可发送邮件
-            # 将收件人、抄送人、密送人以加号连接
-            # email_msg.as_string()是将MIMEText对象或MIMEMultipart对象变为str
-            email_svr.sendmail(sender, receivers, email_msg.as_string())
-    # 如果发生可预知的smtp类错误，则执行下面代码
-    except smtplib.SMTPException as e:
-        print('smtp发生错误，邮件发送失败，错误信息为：', e)
-    # 如果发生不可知的异常则执行下面语句结构中的代码
-    except Exception as e:
-        print('发生不可知的错误，错误信息为：', e)
-    # 如果没发生异常则执行else语句结构中的代码
-    else:
-        print('邮件发送未发生任何异常，一切正常！')
-    # 无论是否发生异常，均执行finally语句结构中的代码
-    finally:
-        print('邮件发送程序已执行完毕！')
-
 
 if __name__ == '__main__':
     Set_seed.setup_seed(0)
-    '''IDPil_closs     IDPil_dkgi   IDPil_gmm_dkgi'''
-    model = IDPil_dkgi().to(config.device)
+    model = IDOL().to(config.device)
 
     Estim_Loss = nn.L1Loss()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=0.0005, momentum=0.4)
 
     w_params = [1, 1, 1, 1]
     train(model, Estim_Loss, optimizer, w_params, config.epochs)
-
-    send_email("PIDspgmm")
