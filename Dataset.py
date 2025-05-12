@@ -60,13 +60,6 @@ def load_dict_from_pickle(file_name):
 def get_fnorm_now_chw(x, statistic_dic):
     x_norm = x.clone()
     for c in range(4):
-        '''处理负值（按通道处理，用每个通道的均值填充）'''
-        # channel_mean = torch.mean(x[c][x[c] > 0])
-        # x_norm[c] = torch.where(x[c] < 0, 0, x[c])
-        '''train'''
-        # maxv = statistic_dic['now_train'][c][0]
-        # minv = statistic_dic['now_train'][c][1]
-        '''all'''
         maxv = statistic_dic['now_all'][c][0]
         minv = statistic_dic['now_all'][c][1]
         x_norm[c] = (x[c] - minv) / (maxv - minv)
@@ -76,144 +69,10 @@ def get_fnorm_now_chw(x, statistic_dic):
 def get_fnorm_p3h_chw(x, statistic_dic):
     x_norm = x.clone()
     for c in range(4):
-        '''处理负值（按通道处理，用每个通道的均值填充）'''
-        # channel_mean = torch.mean(x[c][x[c] > 0])
-        # x_norm[c] = torch.where(x[c] <= 0, 0, x[c])
-        '''train'''
-        # maxv = statistic_dic['p3h_train'][c][0]
-        # minv = statistic_dic['p3h_train'][c][1]
-        '''all'''
         maxv = statistic_dic['p3h_all'][c][0]
         minv = statistic_dic['p3h_all'][c][1]
         x_norm[c] = (x[c] - minv) / (maxv - minv)
     return x_norm
-
-class Findpxh_Dataset_k():
-    def __init__(self, k8_path, pxh, data_transforms=None, data_format='npy'):
-
-        self.data_transforms = data_transforms
-        self.data_format = data_format
-        self.k8_paths = k8_path
-        self.pxh = pxh
-        self.k8_btemps = []
-        self.pxh_k8_btemps = []
-
-        self.msws = []
-        self.rmws = []
-        self.r34s = []
-        self.mslps = []
-
-        self.lats = []
-        self.lons = []
-        self.ts = []
-        self.levels = []
-
-        self.norm_ts = []
-
-        '''
-        get BST Labels:
-        TCName_Isotime --- [iso_time, lat, lon, t, level, mslp, msw, rmw, r34, sai_alpha]
-        '''
-        self.labels_dic = load_dict_from_pickle(config.labels_path)
-
-        # 获取目录下的所有文件
-        k8_files = os.listdir(k8_path)
-        k8_files_set = set(k8_files)
-
-        self.k8_sta_dic = load_dict_from_pickle(config.k8_sta_path)
-
-        # 遍历文件
-        for i, filename in enumerate(k8_files):
-            fname_split = filename.split("_")
-            tcname = fname_split[1]
-            year = fname_split[0]
-            '''e.g. 2023_BOLAVEN_2023100809'''
-            if len(fname_split) == 3:
-                isotime = fname_split[2][:-4]
-            else:
-                isotime = fname_split[2]
-            labels_dic_key = year + "_" + tcname + "_" + isotime
-
-            '''e.g. BOLAVEN_2023100806'''
-            p3h_labels_dic_key = get_previous_npy_index(labels_dic_key, 3)
-            pxh_k8_fname = p3h_labels_dic_key + ".npy"
-            if filename in self.k8_sta_dic['now_inval_record'] or pxh_k8_fname in self.k8_sta_dic['p3h_inval_record']:
-                continue
-            if pxh_k8_fname not in k8_files_set:
-                continue
-            if p3h_labels_dic_key not in self.labels_dic.keys():
-                continue
-            if labels_dic_key not in self.labels_dic.keys():
-                continue
-
-            lat, lon, t, level, mslp, msw, rmw, r34 = self.labels_dic[labels_dic_key][1:]
-
-            if 0.0 in [mslp, msw, rmw, r34]:
-                continue
-
-            self.pxh_k8_btemps.append(k8_path + pxh_k8_fname)
-            self.k8_btemps.append(k8_path + filename)
-            self.msws.append(msw)
-            self.rmws.append(rmw)
-            self.r34s.append(r34)
-            self.mslps.append(mslp)
-
-            self.lats.append(lat)
-            self.lons.append(lon)
-            self.ts.append(t)
-            self.levels.append(level)
-            self.norm_ts.append(t)
-
-        print("msws max = {}, min = {}".format(max(self.msws), min(self.msws)))
-        print("rmws max = {}, min = {}".format(max(self.rmws), min(self.rmws)))
-        print("r34s max = {}, min = {}".format(max(self.r34s), min(self.r34s)))
-        print("mslps max = {}, min = {}".format(max(self.mslps), min(self.mslps)))
-        print("lat max = {}, min = {}".format(max(self.lats), min(self.lats)))
-        print("lon max = {}, min = {}".format(max(self.lons), min(self.lons)))
-        print("t max = {}, min = {}".format(max(self.ts), min(self.ts)))
-
-        # 标签归一化
-        for i in range(len(self.msws)):
-            '''k'''
-            self.msws[i] = (self.msws[i] - 35) / (170 - 35)
-            self.rmws[i] = (self.rmws[i] - 5) / (142 - 5)
-            self.r34s[i] = (self.r34s[i] - 10) / (406.25 - 10)
-            self.mslps[i] = (self.mslps[i] - 882) / (1010 - 882)
-            self.lats[i] = (self.lats[i] - (-32.038)) / (42.491 - (-32.038))
-            self.lons[i] = (self.lons[i] - 83.892) / (195.765 - 83.892)
-            self.ts[i] = (self.ts[i] - 3) / (459 - 3)
-
-    def __len__(self):
-        return len(self.k8_btemps)
-
-    def __getitem__(self, index):
-        # 4, 156, 156
-        btemp_file_path = self.k8_btemps[index]
-        k8_btemp = default_loader(btemp_file_path)
-        k8_btemp = get_fnorm_now_chw(k8_btemp, self.k8_sta_dic)
-
-        # 4, 156, 156
-        pxh_btemp_file_path = self.pxh_k8_btemps[index]
-        pxh_k8_btemp = default_loader(pxh_btemp_file_path)
-        pxh_k8_btemp = get_fnorm_p3h_chw(pxh_k8_btemp, self.k8_sta_dic)
-
-        msw = self.msws[index]
-        rmw = self.rmws[index]
-        r34 = self.r34s[index]
-        mslp = self.mslps[index]
-
-        lat = self.lats[index]
-        lon = self.lons[index]
-        level = self.levels[index]
-        t = self.ts[index]
-        norm_t = self.norm_ts[index]
-
-        sample = {'lat': lat, 'lon': lon, 'occur_t': t, 'cat': level, 'norm_t': norm_t,
-                  'r34': r34, 'rmw': rmw, 'msw': msw, 'mslp': mslp,
-                  'k8_btemp': k8_btemp,
-                  'pxh_k8_btemp': pxh_k8_btemp
-                  }
-        return sample
 
 class Findpxh_Dataset_k_pr():
     def __init__(self, k8_path, pxh, data_transforms=None, data_format='npy'):
@@ -242,14 +101,8 @@ class Findpxh_Dataset_k_pr():
         self.pre_prrs = []
         self.pre_levels = []
         self.norm_ts = []
-
-        '''
-        get BST Labels:
-        TCName_Isotime --- [iso_time, lat, lon, t, level, mslp, msw, rmw, r34, sai_alpha]
-        '''
         self.labels_dic = load_dict_from_pickle(config.labels_path)
 
-        # 获取目录下的所有文件
         k8_files = os.listdir(k8_path)
         k8_files_set = set(k8_files)
 
@@ -265,8 +118,6 @@ class Findpxh_Dataset_k_pr():
             if len(fname_split) == 3:
                 isotime = fname_split[2][:-4]
             else:
-                if fname_split[3] == 'rotate315.npy':
-                    continue
                 isotime = fname_split[2]
             labels_dic_key = year + "_" + tcname + "_" + isotime
 
@@ -347,15 +198,6 @@ class Findpxh_Dataset_k_pr():
         btemp_file_path = self.k8_btemps[index]
         k8_btemp = default_loader(btemp_file_path)
         k8_btemp = get_fnorm_now_chw(k8_btemp, self.k8_sta_dic)
-
-        # plt.figure(figsize=(15, 5))  # 设置画布大小
-        # for i in range(5):
-        #     plt.subplot(1, 5, i + 1)  # 创建子图
-        #     plt.imshow(k8_btemp[i].numpy(), cmap='gray')  # 将 tensor 转换为 numpy 并绘制
-        #     plt.title(f'Channel {i + 1}')
-        #     plt.axis('off')  # 关闭坐标轴
-        #
-        # plt.show()
 
         # 4, 156, 156
         pxh_btemp_file_path = self.pxh_k8_btemps[index]
