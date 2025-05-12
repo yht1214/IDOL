@@ -66,10 +66,7 @@ def test_model(model, dataset):
             TCA_Lable = [i.unsqueeze(1) for i in [msw_label, mslp_label, rmw_label, r34_label]]
             TCA_Lable = torch.cat(TCA_Lable, dim=1)
 
-            # msw, mslp, rmw, r34 = model(btemp, plt, TCA_Lable)
-            # msw, mslp, rmw, r34, loss_sp = model(btemp, plt, TCA_Lable)
-            # msw, mslp, rmw, r34 = model(btemp, plt, pre_pr, TCA_Lable)
-            msw, mslp, rmw, r34, loss_sp = model(btemp, plt, pre_pr, TCA_Lable)
+            msw, mslp, rmw, r34, loss_simr = model(btemp, plt, pre_pr, TCA_Lable)
 
             print("msw_label={}".format(msw_label))
             print("msw={}".format(msw))
@@ -127,15 +124,10 @@ def test_model(model, dataset):
            r34_error, r34_RMSE_sum, r34_label_list, r34_output_list
 
 if __name__ == '__main__':
-    model = torch.load(config.predict_model_dkgi).to(config.device)
+    model = torch.load(config.predict_model).to(config.device)
 
     test_transform = None
-    '''k_era_var_aux'''
-    # test_dataset = Findpxh_Dataset_kva(config.predict_k8_path, config.predict_zqtuv_path,
-    #                                     config.predict_aux_path, 3, None, config.data_format)
-    '''k_era_var'''
-    # test_dataset = Findpxh_Dataset_kv(config.predict_k8_path, config.predict_zqtuv_path, 3, None, config.data_format)
-    '''k'''
+
     test_dataset = Findpxh_Dataset_k_pr(config.predict_k8_path, 3, None, config.data_format)
 
     test_dataloader = torch.utils.data.DataLoader(
