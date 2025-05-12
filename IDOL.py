@@ -380,8 +380,6 @@ class IDOL(nn.Module):
                             [1, 1, 0, 0],
                             [0, 1, 0, 1]], dtype=torch.float)
 
-        '''GInvar_Att'''
-        # shid, mu, logvar = self.opt(nodef, adj, dist.reshape(b, h, w))
         '''GEnc_GMMDist'''
         gdata = GraphD_Construt(nodef, adj).to(config.device)
         shid = self.opt(gdata, dist)
