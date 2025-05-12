@@ -3,7 +3,7 @@ The code of "IDOL: Meeting Diverse Distribution Shifts with Prior Physics for Tr
 
 ## Introduction
 
-![***IDOL_framework***]([https://github.com/Zjut-MultimediaPlus/Phy-CoCo/blob/main/figs/phy-coco.png](https://github.com/yht1214/IDOL/blob/main/figs/fig-IODL.png))
+![***IDOL_framework***]([https://github.com/yht1214/IDOL/blob/main/figs/fig-IODL.png])
 
 Contribution:
 1. To address concept shift in multi-task learning, we propose a Task Dependency Flow learning module. By incorporating the prior wind field model, the conditional probabilities of multiple specific tasks are decoupled to model the dependencies among tasks, thereby facilitating the learning of distinct TC attribute identities.
