@@ -56,7 +56,7 @@ def Dist(shf, id_dim=16):
     dist_samp = torch.normal(fm, fs)
     return dist_samp
 
-'''进入循环前，未知偏置项：自学习参数'''
+# Before entering the loop, unknown bias term: self-learning parameter.
 class EquFM(nn.Module):
     def __init__(self, in_dim, uk_node_num, tolerance=1e-3):
         super(EquFM, self).__init__()
@@ -73,10 +73,9 @@ class EquFM(nn.Module):
         self.fc14 = nn.Linear(in_dim * (uk_node_num + 2), in_dim)
 
     def create_adj_matrix(self, num_nodes):
-        # 初始化为对角线全为1的矩阵
         adj = torch.eye(num_nodes)
 
-        # 设置相邻节点连接
+      # Set the connection of adjacent nodes
         for i in range(num_nodes):
             if i > 0:
                 adj[i, i - 1] = 1
@@ -91,7 +90,7 @@ class EquFM(nn.Module):
         H = torch.zeros_like(x)
         C = torch.randn_like(x) * 1e-6
         uk_nodef = nn.Parameter(torch.randn_like(x).unsqueeze(dim=1).repeat(1, self.ukn_num, 1))
-        '''随机采样生成0/1矩阵'''
+        # Random sampling to generate 0/1 matrix
         # adj = torch.bernoulli(torch.sigmoid(self.adjp))
         adj = self.adj
         adj = adj.to(config.device)
@@ -106,16 +105,16 @@ class EquFM(nn.Module):
         ukf = self.gcn2(self.gcn1(ukn, uk_eidx), uk_eidx)
         # ukf = self.gcn2(self.gcn1(wukn, wuk_eidx), wuk_eidx)
         ukf = self.flatten(ukf)
-        for i in range(num_iter):  # T次循环
-            '''遗忘门'''
+        for i in range(num_iter):  # T times loop
+            '''forget gate'''
             h_old = H
             a_xh = torch.sigmoid(self.fc11(torch.cat([H, x, ukf], dim=1)))
             ca_xh = C*a_xh
-            '''输入门'''
+            '''input gate'''
             ga = torch.sigmoid(self.fc12(torch.cat((H, x), dim=1)))
             gv = torch.tanh(self.fc13(torch.cat((H, x), dim=1)))
             C = ca_xh + ga*gv
-            '''输出门'''
+            '''output gate'''
             a_xh1 = torch.sigmoid(self.fc14(torch.cat([H, x, ukf], dim=1)))
             H = a_xh1 * torch.tanh(C)
             if torch.norm(H - h_old) < self.tolerance:
@@ -157,14 +156,14 @@ class TCAID_pv_nop2v_ori(nn.Module):
             plt: (batch_size, in_dim=2)
             goal: (batch_size, 4)
         Returns:
-            4 task 代表表征pp: (batch_size, 1, id_dim=16)
+            4 task identity tokens: (batch_size, 1, id_dim=16)
         '''
         idp = self.distp(plt, dist)
         idv = self.distv(plt, dist)
 
         b, d = idp.size()
         '''
-        Holland部分
+        Holland part
         rm = [A / (lnF2(v) - lnF3(v))]^pow = C^pow
         r34 = [C / (lnF4(p) - lnF5(p))]^pow = D^pow
         '''
@@ -202,14 +201,12 @@ class GEnc_GMMDist(nn.Module):
         self.relu = nn.ReLU()
         self.conv_z = GCNConv(in_channels, 2 * out_channels)
         self.alpha_sh = GCNConv(2 * out_channels, 1)
-        self.mu = nn.Parameter(torch.randn(num_components, feature_dim))  # 均值向量
-        self.log_var = nn.Parameter(torch.randn(num_components, feature_dim))  # 对数方差
+        self.mu = nn.Parameter(torch.randn(num_components, feature_dim))  # mean vector
+        self.log_var = nn.Parameter(torch.randn(num_components, feature_dim))  # std vector
     def forward(self, gdata, dist):
         batch_size = dist.size(0)
         z = self.conv_z(gdata.x, gdata.edge_index)
-        # 计算混合权重（Softmax归一化）
         alpha_sh = F.softmax(self.alpha_sh(z, gdata.edge_index).squeeze(dim=-1), dim=-1)      # (b, num_components)
-        # 计算方差（确保正值）
         var = torch.exp(self.log_var)  # (num_components, feature_dim)
         dist_expanded = dist.unsqueeze(1)  # (batch_size, 1, feature_dim)
         mu_expanded = self.mu.unsqueeze(0)  # (1, num_components, feature_dim)
@@ -241,7 +238,7 @@ class PRG_SALSTM8(nn.Module):
         memory = torch.zeros_like(x[0])  # [B, 512, 4, 4]
         H = torch.zeros_like(x[0])
         C = torch.randn_like(x[0]) * 1e-6
-        for i in range(x.size(0)):  # T次循环
+        for i in range(x.size(0)):  
             a_xh = torch.sigmoid(self.conv10(torch.cat((H, x[i], en_1d), dim=1)))  
             ca_xh = C*a_xh
             ga = torch.sigmoid(self.conv11(torch.cat((H, x[i], en_1d), dim=1)))
@@ -288,20 +285,18 @@ class PRG_SALSTM8(nn.Module):
         return H
 
 def GraphD_Construt(nodef, adj):
-    # 构造边索引（Edge Index）和边权重（Edge Weight）
     edge_index = []
     edge_weight = []
     b, n, d = nodef.size()
-    # 构造输入和估计值之间的边
     for i in range(n):
         for j in range(n):
             if adj[i, j] != 0:
-                edge_index.append([i, j])  # 从输入节点到输出节点
-                edge_index.append([j, i])  # 从输出节点到输入节点
+                edge_index.append([i, j])  
+                edge_index.append([j, i])  
                 edge_weight.append(adj[i, j])
                 edge_weight.append(adj[i, j])
 
-    edge_index = torch.tensor(edge_index).t().contiguous()  # 转置并转换为tensor
+    edge_index = torch.tensor(edge_index).t().contiguous()  
     edge_weight = torch.tensor(edge_weight, dtype=torch.float)
     data = Data(x=nodef, edge_index=edge_index, edge_attr=edge_weight)
     return data
@@ -407,5 +402,6 @@ class IDOL(nn.Module):
         return simrloss
     def initialize(self):
         initialize_weights(self)
+
 
 
