@@ -8,39 +8,30 @@ import pickle
 import matplotlib.pyplot as plt
 
 def find_previous_hours(time_str, x):
-    # 解析时间字符串
+    # Parse time string
     time_format = "%Y%m%d%H"
     time = datetime.strptime(time_str, time_format)
 
-    # 计算前x小时
     previous_time = time - timedelta(hours=x)
 
-    # 将结果转换为字符串
+    # transform to string
     previous_time_str = previous_time.strftime(time_format)
 
     return previous_time_str
 
 def get_previous_npy_index(npy_index, x):
-    """
-    根据给定的 npy_index 和小时数 x，返回前 x 小时的 npy_index。
-    npy_index 格式: '年份_台风名字_时间'，例如 '2019_台风名字_2019010506'
-    """
-    # 解析 npy_index
+    # parse npy_index
     parts = npy_index.split('_')
     year_typhoon_name = parts[0] + '_' + parts[1]
     time_str = parts[2]  # 例如 '2019010506'
 
-    # 将时间字符串转换为 datetime 对象
     time_format = '%Y%m%d%H'
     time_obj = datetime.strptime(time_str, time_format)
 
-    # 减去 x 小时
     previous_time_obj = time_obj - timedelta(hours=x)
 
-    # 将 datetime 对象转换回字符串
     previous_time_str = previous_time_obj.strftime(time_format)
 
-    # 重新拼接生成新的 npy_index
     previous_npy_index = year_typhoon_name + "_" + previous_time_str
 
     return previous_npy_index
@@ -56,7 +47,6 @@ def load_dict_from_pickle(file_name):
         data = pickle.load(f)
     return data
 
-'''full整体归一'''
 def get_fnorm_now_chw(x, statistic_dic):
     x_norm = x.clone()
     for c in range(4):
@@ -109,7 +99,6 @@ class Findpxh_Dataset_k_pr():
         self.k8_sta_dic = load_dict_from_pickle(config.k8_sta_path)
         pre12h_labels_data = load_dict_from_pickle(config.p12hpr_pth)
 
-        # 遍历文件
         for i, filename in enumerate(k8_files):
             fname_split = filename.split("_")
             tcname = fname_split[1]
@@ -175,9 +164,7 @@ class Findpxh_Dataset_k_pr():
         print("pre_pwr max = {}, min = {}".format(max(self.pre_pwrs), min(self.pre_pwrs)))
         print("pre_prr max = {}, min = {}".format(max(self.pre_prrs), min(self.pre_prrs)))
 
-        # 标签归一化
         for i in range(len(self.msws)):
-            '''pre 12 h PR'''
             self.msws[i] = (self.msws[i] - 35) / (170 - 35)
             self.rmws[i] = (self.rmws[i] - 5) / (130 - 5)
             self.r34s[i] = (self.r34s[i] - 10) / (406.25 - 10)
@@ -241,5 +228,6 @@ if __name__ == '__main__':
     #     k8_btemp = data["k8_btemp"]
         # print("k8_btemp shape", k8_btemp.size())
         # pxh_k8_btemp = data["pxh_k8_btemp"]
+
 
 
