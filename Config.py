@@ -16,7 +16,8 @@ model_output_dir = '/opt/data/private/model/'
 predict_model = '/opt/data/private/model/epoch_200.pth'
 save_fig_dir = '/opt/data/private/model/exp_img/'
 
-num_workers = 4  # 加载数据集线程并发数
-save_model_iter = 20  # 每多少次保存一份模型
+num_workers = 4  
+save_model_iter = 20 
 
 data_format = 'npy'
+
