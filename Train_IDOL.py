@@ -93,7 +93,7 @@ def train_model(model, loss_func, dataset, optimizer, w_params, epoch):
         total_loss.backward()
         optimizer.step()
 
-        # 监控梯度
+        # monitor gradient
         if batch % 5 == 0:
             for param in model.parameters():
                 if param.grad is not None:
@@ -270,7 +270,7 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
     )
 
     '''
-    训练模型
+    training model
     '''
     start_epoch = 0
     train_loss_array = np.zeros(epochs + 1)
@@ -308,18 +308,17 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
         train_r34_error_array[epoch] = train_r34_error
         valid_r34_error_array[epoch] = valid_r34_error
 
-        # 模型保存
+        # saving model
         if epoch % config.save_model_iter == 0:
             save_model(model, config.model_output_dir, epoch)
 
-    # 绘制loss
+    # paint loss
     fig_loss, ax_loss = plt.subplots(figsize=(12, 8))
     train_loss, = plt.plot(np.arange(1, epochs + 1), train_loss_array[1:], 'r')
     val_loss, = plt.plot(np.arange(1, epochs + 1), valid_loss_array[1:], 'g')
     plt.xlabel('epochs')
     plt.ylabel('Estimation loss')
     plt.title("train/valid loss vs epoch")
-    # 添加图例
     ax_loss.legend(handles=[train_loss, val_loss], labels=['train_epoch_loss', 'val_epoch_loss'],
                          loc='best')
     fig_loss.savefig(config.save_fig_dir + 'loss.png')
@@ -331,7 +330,6 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
     plt.xlabel('epochs')
     plt.ylabel('simr loss')
     plt.title("train/valid simr loss vs epoch")
-    # 添加图例
     ax_simr.legend(handles=[train_simr, val_simr], labels=['train_epoch_loss', 'val_epoch_loss'],
                    loc='best')
     fig_simr.savefig(config.save_fig_dir + 'simr_loss.png')
@@ -345,7 +343,6 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
     plt.xlabel('epochs')
     plt.ylabel('msw error')
     plt.title("train/valid error vs epoch")
-    # 添加图例
     ax_msw_error.legend(handles=[train_msw_error,
                               valid_msw_error],
                      labels=['train_error', 'valid_error'],
@@ -361,7 +358,6 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
     plt.xlabel('epochs')
     plt.ylabel('mslp error')
     plt.title("train/valid error vs epoch")
-    # 添加图例
     ax_mslp_error.legend(handles=[train_mslp_error,
                                  valid_mslp_error],
                         labels=['train_error', 'valid_error'],
@@ -377,7 +373,6 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
     plt.xlabel('epochs')
     plt.ylabel('RMW Error')
     plt.title("train/valid error vs epoch")
-    # 添加图例
     ax_rmw_error.legend(handles=[train_rmw_error,
                                  valid_rmw_error],
                         labels=['train_error', 'valid_error'],
@@ -393,7 +388,6 @@ def train(model, Estim_Loss, optimizer, w_params, epochs):
     plt.xlabel('epochs')
     plt.ylabel('R34 Error')
     plt.title("train/valid error vs epoch")
-    # 添加图例
     ax_r34_error.legend(handles=[train_r34_error,
                                  valid_r34_error],
                         labels=['train_error', 'valid_error'],
@@ -411,3 +405,4 @@ if __name__ == '__main__':
 
     w_params = [1, 1, 1, 1]
     train(model, Estim_Loss, optimizer, w_params, config.epochs)
+
