@@ -1,5 +1,5 @@
 # IDOL
-The code of "IDOL: Meeting Diverse Distribution Shifts with Prior Physics for Tropical Cyclone Multi-Task Estimation" was accepted to NIPS2025.
+The code of "IDOL: Meeting Diverse Distribution Shifts with Prior Physics for Tropical Cyclone Multi-Task Estimation" was accepted to NeurIPS2025.
 
 ## Introductionaccept
 ![image](https://github.com/yht1214/IDOL/blob/main/figs/fig-IODL.png)
